@@ -270,6 +270,7 @@ class Mailbox:
                                     "no driving subscriber requested it."
                                 )
 
+                self.log.debug(f"Fetching message {i} from source")
                 try:
                     x = next(iterable)
                 except StopIteration:
@@ -373,7 +374,9 @@ class Mailbox:
                     return self._has_msg(next_number) or self.killed
 
                 if not next_ready():
-                    self.log.debug(f"Checking/waiting for {next_number}")
+                    self.log.debug(
+                        f"Checking/waiting for {next_number} in subscriber {subscriber_i}"
+                    )
                     self._subscriber_waiting_for[subscriber_i] = next_number
                     if self.lazy and self._can_fetch():
                         self._fetch_new_condition.notify_all()
@@ -408,6 +411,7 @@ class Mailbox:
                 while len(self._mailbox) and (
                     min(self._subscribers_have_read) >= self._lowest_msg_number
                 ):
+                    self.log.debug(f"Cleaning up {self._lowest_msg_number}")
                     heapq.heappop(self._mailbox)
 
                 if self.lazy and self._can_fetch():
@@ -419,7 +423,9 @@ class Mailbox:
                     break
                 elif isinstance(msg, Future):
                     if not msg.done():
-                        self.log.debug(f"Waiting for future {msg_number}")
+                        self.log.debug(
+                            f"Waiting for future {msg_number} in subscriber {subscriber_i}"
+                        )
                         try:
                             res = msg.result(timeout=self.timeout)
                         except TimeoutError:
@@ -431,6 +437,7 @@ class Mailbox:
                 else:
                     res = msg
 
+                self.log.debug(f"Yielding {msg_number} in subscriber {subscriber_i}")
                 try:
                     yield res
                 except Exception as e:
