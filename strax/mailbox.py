@@ -102,28 +102,8 @@ class Mailbox:
         self._threads = []
         self._lock = threading.RLock()
 
-        self.log = logging.getLogger(self.name)
-
+        self._setup_logging()
         
-        # Carlo: setting up formatter for mailbox logger
-        
-        # create formatter
-        formatter = logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(name)s (%(lineno)s) | %(message)s"
-        )
-
-        # set this formatter to console handler
-        ch = logging.StreamHandler()
-        ch.setFormatter(formatter)
-
-        # add console handler to logger
-        self.log.addHandler(ch)
-
-        # avoid duplicate messages
-        self.log.propagate = False
-
-
-
         # Conditions to wait on
         # Do NOT call notify_all when the condition is False!
         # We use wait_for, which also returns False when the timeout is broken
@@ -162,6 +142,27 @@ class Mailbox:
         self._fetch_new_condition = Condition("_fetch_new_condition", self.log, lock=self._lock)
 
         self.log.debug("Initialized")
+
+
+    def _setup_logging(self):
+        """Set up logging for this mailbox."""
+
+        self.log = logging.getLogger("mailbox."+self.name)
+
+        # create formatter
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s (%(lineno)s) | %(message)s"
+        )
+
+        # set this formatter to console handler
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+
+        # add console handler to logger
+        self.log.addHandler(ch)
+
+        # avoid duplicate messages
+        self.log.propagate = False
 
     def add_sender(self, source, name=None):
         """Configure mailbox to read from an iterable source.
