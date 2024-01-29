@@ -101,7 +101,28 @@ class Mailbox:
         self._n_sent = 0
         self._threads = []
         self._lock = threading.RLock()
+
         self.log = logging.getLogger(self.name)
+
+        
+        # Carlo: setting up formatter for mailbox logger
+        
+        # create formatter
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s (%(lineno)s) | %(message)s"
+        )
+
+        # set this formatter to console handler
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+
+        # add console handler to logger
+        self.log.addHandler(ch)
+
+        # avoid duplicate messages
+        self.log.propagate = False
+
+
 
         # Conditions to wait on
         # Do NOT call notify_all when the condition is False!
