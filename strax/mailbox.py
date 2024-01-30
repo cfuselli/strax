@@ -418,7 +418,17 @@ class Mailbox:
                         self.log.debug(f"{next_number} is StopIteration")
                         last_message = True
                     to_yield.append((next_number, msg))
+
+                    self._subscribers_have_read[subscriber_i] = next_number
+
                     next_number += 1
+
+                    # Clean up the mailbox
+                    while len(self._mailbox) and (
+                        min(self._subscribers_have_read) >= self._lowest_msg_number
+                    ):
+                        self.log.debug(f"Cleaning up {self._lowest_msg_number}")
+                        heapq.heappop(self._mailbox)
 
                 if len(to_yield) > 1:
                     self.log.debug(
@@ -426,15 +436,6 @@ class Mailbox:
                     )
                 else:
                     self.log.debug(f"Read {to_yield[0][0]} in subscriber {subscriber_i}")
-
-                self._subscribers_have_read[subscriber_i] = next_number - 1
-
-                # Clean up the mailbox
-                while len(self._mailbox) and (
-                    min(self._subscribers_have_read) >= self._lowest_msg_number
-                ):
-                    self.log.debug(f"Cleaning up {self._lowest_msg_number}")
-                    heapq.heappop(self._mailbox)
 
                 if self.lazy and self._can_fetch():
                     self._fetch_new_condition.notify_all()
