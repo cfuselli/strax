@@ -410,11 +410,16 @@ class Mailbox:
                     self.log.debug(f"Reader finds {self.name} killed")
                     raise MailboxKilled(self.killed_because)
 
+                self.log.debug(f"_has_msg({next_number}) = {self._has_msg(next_number)}")
+
                 # Grab one message if we can
-                if self._has_msg(next_number):
+                while self._has_msg(next_number):
 
                     msg_number = next_number
                     next_number += 1
+
+                    self.log.debug(f"_has_msg({next_number}) = {self._has_msg(next_number)}")
+
 
                     msg = self._get_msg(msg_number)
                     if msg is StopIteration:
