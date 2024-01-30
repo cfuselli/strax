@@ -410,61 +410,60 @@ class Mailbox:
                     self.log.debug(f"Reader finds {self.name} killed")
                     raise MailboxKilled(self.killed_because)
 
-                # Grab all messages we can yield
-                to_yield = []
+                self.log.debug(f"_has_msg({next_number}) = {self._has_msg(next_number)}")
+
+                # Grab one message if we can
                 while self._has_msg(next_number):
-                    msg = self._get_msg(next_number)
-                    if msg is StopIteration:
-                        self.log.debug(f"{next_number} is StopIteration")
-                        last_message = True
-                    to_yield.append((next_number, msg))
+
+                    msg_number = next_number
                     next_number += 1
 
-                if len(to_yield) > 1:
-                    self.log.debug(
-                        f"Read {to_yield[0][0]}-{to_yield[-1][0]} in subscriber {subscriber_i}"
-                    )
-                else:
-                    self.log.debug(f"Read {to_yield[0][0]} in subscriber {subscriber_i}")
+                    self.log.debug(f"_has_msg({next_number}) = {self._has_msg(next_number)}")
 
-                self._subscribers_have_read[subscriber_i] = next_number - 1
 
-                # Clean up the mailbox
-                while len(self._mailbox) and (
-                    min(self._subscribers_have_read) >= self._lowest_msg_number
-                ):
-                    self.log.debug(f"Cleaning up {self._lowest_msg_number}")
-                    heapq.heappop(self._mailbox)
+                    msg = self._get_msg(msg_number)
+                    if msg is StopIteration:
+                        self.log.debug(f"{msg_number} is StopIteration")
+                        last_message = True
+                    else: 
+                        # Process the message
+                        self._subscribers_have_read[subscriber_i] = msg_number
 
-                if self.lazy and self._can_fetch():
-                    self._fetch_new_condition.notify_all()
-                self._write_condition.notify_all()
+                        # Clean up the mailbox
+                        while len(self._mailbox) and (
+                            min(self._subscribers_have_read) >= self._lowest_msg_number
+                        ):
+                            self.log.debug(f"Cleaning up {self._lowest_msg_number}")
+                            heapq.heappop(self._mailbox)
 
-            for msg_number, msg in to_yield:
-                if msg is StopIteration:
-                    break
-                elif isinstance(msg, Future):
-                    if not msg.done():
-                        self.log.debug(
-                            f"Waiting for future {msg_number} in subscriber {subscriber_i}"
-                        )
+                        if self.lazy and self._can_fetch():
+                            self._fetch_new_condition.notify_all()
+
+                        self._write_condition.notify_all()
+
+                        if isinstance(msg, Future):
+                            if not msg.done():
+                                self.log.debug(
+                                    f"Waiting for future {msg_number} in subscriber {subscriber_i}"
+                                )
+                                try:
+                                    res = msg.result(timeout=self.timeout)
+                                except TimeoutError:
+                                    raise TimeoutError(f"Future {msg_number} timed out!")
+                                self.log.debug(f"Future {msg_number} completed")
+                            else:
+                                res = msg.result()
+                                self.log.debug(f"Future {msg_number} was already done")
+
+                        else:
+                            res = msg
+
+                        self.log.debug(f"Yielding {msg_number} in subscriber {subscriber_i}")
+
                         try:
-                            res = msg.result(timeout=self.timeout)
-                        except TimeoutError:
-                            raise TimeoutError(f"Future {msg_number} timed out!")
-                        self.log.debug(f"Future {msg_number} completed")
-                    else:
-                        res = msg.result()
-                        self.log.debug(f"Future {msg_number} was already done")
-                else:
-                    res = msg
-
-                self.log.debug(f"Yielding {msg_number} in subscriber {subscriber_i}")
-                try:
-                    yield res
-                except Exception as e:
-                    # TODO: Should I also handle timeout errors like this?
-                    self.kill_from_exception(e)
+                            yield res
+                        except Exception as e:
+                            self.kill_from_exception(e)
 
         self.log.debug("Done reading")
 
